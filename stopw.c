@@ -21,7 +21,7 @@ void enableRawMode() {
     // disable output line buffering
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    // enable echoing typed characters, and switch to raw (byte-by-byte) mode
+    // disable echoing typed characters, and switch to raw (byte-by-byte) mode
     tcgetattr(STDIN_FILENO, &orig_termios);
     atexit(disableRawMode);
     struct termios raw = orig_termios;
@@ -76,8 +76,8 @@ int main() {
 
     int ready;
     int running = 0;
-    long elapsed_ms = 0;
-    long curr_ms;
+    long prev_ms = 0;
+    long total_ms = 0;
     int timeout_ms = 9;
     struct timespec t_start;
     struct timespec t_now;
@@ -89,7 +89,7 @@ int main() {
             keypress = getchar();
             if (keypress == ' ' || keypress == 's') {
                 if (running) {
-                    elapsed_ms += tdiff_ms(&t_start, &t_now);
+                    prev_ms += tdiff_ms(&t_start, &t_now);
                 } else {
                     t_start = t_now;
                 }
@@ -97,7 +97,7 @@ int main() {
                 print_header(running);
             } else if (keypress == 'r') {
                 running = 0;
-                elapsed_ms = 0;
+                prev_ms = 0;
                 clock_gettime(CLOCK_MONOTONIC, &t_start);
             }
         } else if (ready == -1) {
@@ -106,18 +106,16 @@ int main() {
             return 1;
         }
 
+        total_ms = prev_ms;
         if (running) {
-            curr_ms = tdiff_ms(&t_start, &t_now);
-        } else {
-            curr_ms = 0;
+            total_ms += tdiff_ms(&t_start, &t_now);
         }
-        long ms = elapsed_ms + curr_ms;
-        long ss = ms / 1000;
+        long ss = total_ms / 1000;
         long mm = ss / 60;
         long hh = mm / 60;
-        printf("\e7\e[%d;%df%02lu:%02lu:%02lu.%03lu\e8", 2, 2, hh, mm % 60, ss % 60, ms % 1000);
+        printf("\e7\e[%d;%df%02lu:%02lu:%02lu.%03lu\e8", 2, 2, hh, mm % 60, ss % 60, total_ms % 1000);
     }
-    printf("\e7\e[%d;%dfTotal measured time in milliseconds: %lu\e8\n", 3, 2, elapsed_ms + curr_ms);
+    printf("\e7\e[%d;%dfTotal measured time in milliseconds: %lu\e8\n", 3, 2, total_ms);
     printf("\e[4;0H"); // move cursor to 4,0
     return 0;
 }
